@@ -1,0 +1,2369 @@
+{
+  "name": "My workflow",
+  "nodes": [
+    {
+      "parameters": {
+        "formTitle": "upload  file",
+        "formDescription": "Students  details ",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "File_upload",
+              "fieldType": "file"
+            }
+          ]
+        },
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.6,
+      "position": [
+        -256,
+        0
+      ],
+      "id": "2017718d-99f2-4bd2-8d17-45458593061e",
+      "name": "CSV_upload",
+      "webhookId": "671ef202-9a8c-4b37-b5de-34b8aad137d3"
+    },
+    {
+      "parameters": {
+        "binaryPropertyName": "File_upload",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1.1,
+      "position": [
+        -32,
+        0
+      ],
+      "id": "da2eb1a4-e33b-4dcc-ba37-2ed52a32bc4d",
+      "name": "Extract from File"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Clean this student enrollment row and return ONLY a JSON object.\n\nRaw data: {{ JSON.stringify($json) }}\n\nRules:\n- Student_ID: keep as is (must match STU followed by 4 digits)\n- Name: Title Case (e.g., Manoj K)\n- Email: if invalid or incomplete, set INVALID_EMAIL\n- Phone: if less than or more than 10 digits, set MISSING\n- Course: normalize to Python, Machine Learning, or Data Science (e.g., ml -> Machine Learning)\n- Fee_Paid: yes/YES/Yes = true, no/NO/No = false\n- City: Title Case, if empty set UNKNOWN\n- Enrolled_Date: convert from DD-MM-YYYY to YYYY-MM-DD format\nEmail: Add a new key \"is_email_valid\": true if the email format is valid, false if invalid.\n\nPhone: Add a new key \"is_phone_valid\": true if it is exactly 10 digits, false if invalid.\nReturn ONLY raw JSON. No explanation. No markdown.",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": []
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [
+        192,
+        0
+      ],
+      "id": "30ef5a26-3bf3-40b6-9225-75429d776fa6",
+      "name": "Basic LLM Chain"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Get the current item's JSON\nconst item = $input.item.json;\n\n// Check multiple possible paths where the AI text could be stored\nlet rawText = null;\n\nif (item.response?.generations?.[0]?.[0]?.text) {\n    rawText = item.response.generations[0][0].text;\n} else if (item.text) {\n    rawText = item.text;\n} else if (item.output) {\n    rawText = item.output;\n} else {\n    // If it's stored somewhere else, look for it or stringify for debugging\n    rawText = typeof item === 'string' ? item : JSON.stringify(item);\n}\n\n// Clean up markdown block formatting if the AI added ```json ... ```\nif (typeof rawText === 'string') {\n    rawText = rawText.replace(/```json/g, \"\").replace(/```/g, \"\").trim();\n}\n\n// Parse into a clean JSON object\nreturn JSON.parse(rawText);"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1024,
+        400
+      ],
+      "id": "67e93989-31d4-4c4b-b318-2953dd32d6f4",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        144,
+        192
+      ],
+      "id": "9e05bd1d-482a-42ab-8fed-ed9be60d7dd6",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "7cvqYDvAg2GteOxC",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "98fc131c-e27a-4341-9691-ce408223928f",
+              "leftValue": "={{ $json.City }}",
+              "rightValue": "=Chennai",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "840bf506-a281-49cf-a439-fd4eb4bc6ab2",
+              "leftValue": "",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1008,
+        -144
+      ],
+      "id": "ed66df0f-41b8-475c-9139-b048e44fdc9c",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        704,
+        144
+      ],
+      "id": "7041caf0-789f-4e59-b0e5-38b212633bc4",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "7cd0475d-5f55-4f34-ba1b-383c300a1b1c",
+              "leftValue": "={{ $json.City }}",
+              "rightValue": "Chennai",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "9b92c281-cd0d-42b5-aae4-45ff7fb63374",
+              "leftValue": "={{ $json.is_email_valid }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        1424,
+        -224
+      ],
+      "id": "e55b848f-7b49-4ce5-8132-481c62dcaac6",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {
+          "fileName": "chennai_valid_mails"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1696,
+        -272
+      ],
+      "id": "f6dbb9c6-4235-4d74-b2bf-f4706788b419",
+      "name": "chennai_valid_mails"
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {
+          "fileName": "chennai_invalid_mail"
+        }
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1808,
+        -64
+      ],
+      "id": "9a9d0dfe-76fb-4164-9ac1-12d87ca26a8d",
+      "name": "chennai_invalid_mail"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        1312,
+        32
+      ],
+      "id": "1986bdb4-9678-4154-bac6-a0c7c09d1805",
+      "name": "other district"
+    }
+  ],
+  "pinData": {
+    "Basic LLM Chain": [
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1001\",\n  \"Name\": \"Manoj K\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"is_email_valid\": false,\n  \"Phone\": \"MISSING\",\n  \"is_phone_valid\": false,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": true,\n  \"City\": \"Chennai\",\n  \"Enrolled_Date\": \"2025-05-23\"\n}"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1002\",\n  \"Name\": \"Priya S\",\n  \"Email\": \"priya.s@yahoo.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"MISSING\",\n  \"is_phone_valid\": false,\n  \"Course\": \"Machine Learning\",\n  \"Fee_Paid\": false,\n  \"City\": \"Coimbatore\",\n  \"Enrolled_Date\": \"2025-05-06\"\n}"
+        },
+        "pairedItem": {
+          "item": 1
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1003\",\n  \"Name\": \"Ravi Kumar\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"is_email_valid\": false,\n  \"Phone\": \"9123456789\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": true,\n  \"City\": \"Madurai\",\n  \"Enrolled_Date\": \"2025-02-19\"\n}"
+        },
+        "pairedItem": {
+          "item": 2
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1004\",\n  \"Name\": \"Anitha R\",\n  \"Email\": \"anitha@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"9000011111\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Machine Learning\",\n  \"Fee_Paid\": false,\n  \"City\": \"Chennai\",\n  \"Enrolled_Date\": \"2025-04-05\"\n}"
+        },
+        "pairedItem": {
+          "item": 3
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1005\",\n  \"Name\": \"Karthik\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"is_email_valid\": false,\n  \"Phone\": \"MISSING\",\n  \"is_phone_valid\": false,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": true,\n  \"City\": \"UNKNOWN\",\n  \"Enrolled_Date\": \"2025-02-08\"\n}"
+        },
+        "pairedItem": {
+          "item": 4
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1006\",\n  \"Name\": \"Deepa M\",\n  \"Email\": \"deepam@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"8123456789\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Data Science\",\n  \"Fee_Paid\": true,\n  \"City\": \"Salem\",\n  \"Enrolled_Date\": \"2025-03-09\"\n}"
+        },
+        "pairedItem": {
+          "item": 5
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1007\",\n  \"Name\": \"Suresh T\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"is_email_valid\": false,\n  \"Phone\": \"MISSING\",\n  \"is_phone_valid\": false,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": false,\n  \"City\": \"Trichy\",\n  \"Enrolled_Date\": \"2025-01-14\"\n}"
+        },
+        "pairedItem": {
+          "item": 6
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1008\",\n  \"Name\": \"Kavitha\",\n  \"Email\": \"kavitha99@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"9988776655\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Machine Learning\",\n  \"Fee_Paid\": true,\n  \"City\": \"Chennai\",\n  \"Enrolled_Date\": \"2025-01-15\"\n}"
+        },
+        "pairedItem": {
+          "item": 7
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1009\",\n  \"Name\": \"Rajesh Kk\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"is_email_valid\": false,\n  \"Phone\": \"MISSING\",\n  \"is_phone_valid\": false,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": true,\n  \"City\": \"Coimbatore\",\n  \"Enrolled_Date\": \"2025-05-15\"\n}"
+        },
+        "pairedItem": {
+          "item": 8
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1010\",\n  \"Name\": \"Nithya R\",\n  \"Email\": \"nithyar@yahoo.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"9765432109\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Data Science\",\n  \"Fee_Paid\": false,\n  \"City\": \"Madurai\",\n  \"Enrolled_Date\": \"2025-04-25\"\n}"
+        },
+        "pairedItem": {
+          "item": 9
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1011\",\n  \"Name\": \"Arun P\",\n  \"Email\": \"arunp@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"7788990011\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": true,\n  \"City\": \"Chennai\",\n  \"Enrolled_Date\": \"2025-06-17\"\n}"
+        },
+        "pairedItem": {
+          "item": 10
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1012\",\n  \"Name\": \"Meena D\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"is_email_valid\": false,\n  \"Phone\": \"MISSING\",\n  \"is_phone_valid\": false,\n  \"Course\": \"Machine Learning\",\n  \"Fee_Paid\": true,\n  \"City\": \"Salem\",\n  \"Enrolled_Date\": \"2025-02-21\"\n}"
+        },
+        "pairedItem": {
+          "item": 11
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1013\",\n  \"Name\": \"Santhosh V\",\n  \"Email\": \"santhoshv@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"9900112233\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": false,\n  \"City\": \"Trichy\",\n  \"Enrolled_Date\": \"2025-01-26\"\n}"
+        },
+        "pairedItem": {
+          "item": 12
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1014\",\n  \"Name\": \"Lakshmi\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"is_email_valid\": false,\n  \"Phone\": \"MISSING\",\n  \"is_phone_valid\": false,\n  \"Course\": \"Data Science\",\n  \"Fee_Paid\": true,\n  \"City\": \"Chennai\",\n  \"Enrolled_Date\": \"2025-03-07\"\n}"
+        },
+        "pairedItem": {
+          "item": 13
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1015\",\n  \"Name\": \"Vijay S\",\n  \"Email\": \"vijays@yahoo.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"9922334455\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Machine Learning\",\n  \"Fee_Paid\": true,\n  \"City\": \"Coimbatore\",\n  \"Enrolled_Date\": \"2025-04-24\"\n}"
+        },
+        "pairedItem": {
+          "item": 14
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1016\",\n  \"Name\": \"Pooja N\",\n  \"Email\": \"poojan@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"9090909090\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": false,\n  \"City\": \"UNKNOWN\",\n  \"Enrolled_Date\": \"2025-02-16\"\n}"
+        },
+        "pairedItem": {
+          "item": 15
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1017\",\n  \"Name\": \"Dinesh R\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"is_email_valid\": false,\n  \"Phone\": \"MISSING\",\n  \"is_phone_valid\": false,\n  \"Course\": \"Data Science\",\n  \"Fee_Paid\": true,\n  \"City\": \"Madurai\",\n  \"Enrolled_Date\": \"2025-02-23\"\n}"
+        },
+        "pairedItem": {
+          "item": 16
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1018\",\n  \"Name\": \"Saranya\",\n  \"Email\": \"saranya22@gmail.com\",\n  \"is_email_valid\": false,\n  \"Phone\": \"MISSING\",\n  \"Course\": \"Python\",\n  \"Fee_Paid\": true,\n  \"City\": \"Chennai\",\n  \"Enrolled_Date\": \"2025-02-11\"\n}"
+        },
+        "pairedItem": {
+          "item": 17
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1019\",\n  \"Name\": \"Bala K\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"Phone\": \"MISSING\",\n  \"Course\": \"Machine Learning\",\n  \"Fee_Paid\": false,\n  \"City\": \"Salem\",\n  \"Enrolled_Date\": \"2025-06-12\",\n  \"is_email_valid\": false,\n  \"is_phone_valid\": false\n}"
+        },
+        "pairedItem": {
+          "item": 18
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1020\",\n  \"Name\": \"Revathi M\",\n  \"Email\": \"revathim@yahoo.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"9191919191\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Machine Learning\",\n  \"Fee_Paid\": true,\n  \"City\": \"Trichy\",\n  \"Enrolled_Date\": \"2025-06-12\"\n}"
+        },
+        "pairedItem": {
+          "item": 19
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1021\",\n  \"Name\": \"Muthu S\",\n  \"Email\": \"muthus@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"8282828282\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": true,\n  \"City\": \"Chennai\",\n  \"Enrolled_Date\": \"2025-02-24\"\n}"
+        },
+        "pairedItem": {
+          "item": 20
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1022\",\n  \"Name\": \"Geetha\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"Phone\": \"MISSING\",\n  \"Course\": \"Data Science\",\n  \"Fee_Paid\": false,\n  \"City\": \"Coimbatore\",\n  \"Enrolled_Date\": \"2025-05-08\",\n  \"is_email_valid\": false,\n  \"is_phone_valid\": false\n}"
+        },
+        "pairedItem": {
+          "item": 21
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1023\",\n  \"Name\": \"Prasanth J\",\n  \"Email\": \"prasanthj@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"7474747474\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": true,\n  \"City\": \"Madurai\",\n  \"Enrolled_Date\": \"2025-03-05\"\n}"
+        },
+        "pairedItem": {
+          "item": 22
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1024\",\n  \"Name\": \"Divya P\",\n  \"Email\": \"divyap@yahoo.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"8585858585\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Machine Learning\",\n  \"Fee_Paid\": true,\n  \"City\": \"Chennai\",\n  \"Enrolled_Date\": \"2025-06-10\"\n}"
+        },
+        "pairedItem": {
+          "item": 23
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1025\",\n  \"Name\": \"Senthil K\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"is_email_valid\": false,\n  \"Phone\": \"MISSING\",\n  \"is_phone_valid\": false,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": false,\n  \"City\": \"Trichy\",\n  \"Enrolled_Date\": \"2025-05-15\"\n}"
+        },
+        "pairedItem": {
+          "item": 24
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1026\",\n  \"Name\": \"Janaki R\",\n  \"Email\": \"janakir@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"9696969696\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Data Science\",\n  \"Fee_Paid\": true,\n  \"City\": \"Salem\",\n  \"Enrolled_Date\": \"2025-05-02\"\n}"
+        },
+        "pairedItem": {
+          "item": 25
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1027\",\n  \"Name\": \"Ramesh M\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"is_email_valid\": false,\n  \"Phone\": \"MISSING\",\n  \"is_phone_valid\": false,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": true,\n  \"City\": \"Chennai\",\n  \"Enrolled_Date\": \"2025-03-01\"\n}"
+        },
+        "pairedItem": {
+          "item": 26
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1028\",\n  \"Name\": \"Usha D\",\n  \"Email\": \"ushad@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"8989898989\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Machine Learning\",\n  \"Fee_Paid\": false,\n  \"City\": \"Madurai\",\n  \"Enrolled_Date\": \"2025-04-21\"\n}"
+        },
+        "pairedItem": {
+          "item": 27
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1029\",\n  \"Name\": \"Gopal V\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"is_email_valid\": false,\n  \"Phone\": \"MISSING\",\n  \"is_phone_valid\": false,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": true,\n  \"City\": \"Coimbatore\",\n  \"Enrolled_Date\": \"2025-01-12\"\n}"
+        },
+        "pairedItem": {
+          "item": 28
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1030\",\n  \"Name\": \"Thenmozhi\",\n  \"Email\": \"thenmozhi@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"8121212121\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Machine Learning\",\n  \"Fee_Paid\": true,\n  \"City\": \"UNKNOWN\",\n  \"Enrolled_Date\": \"2025-04-13\"\n}"
+        },
+        "pairedItem": {
+          "item": 29
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1031\",\n  \"Name\": \"Arjun C\",\n  \"Email\": \"arjunc@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"7232323232\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": false,\n  \"City\": \"Trichy\",\n  \"Enrolled_Date\": \"2025-01-15\"\n}"
+        },
+        "pairedItem": {
+          "item": 30
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1032\",\n  \"Name\": \"Swetha L\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"is_email_valid\": false,\n  \"Phone\": \"MISSING\",\n  \"is_phone_valid\": false,\n  \"Course\": \"Data Science\",\n  \"Fee_Paid\": true,\n  \"City\": \"Chennai\",\n  \"Enrolled_Date\": \"2025-05-26\"\n}"
+        },
+        "pairedItem": {
+          "item": 31
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1033\",\n  \"Name\": \"Naveen B\",\n  \"Email\": \"naveenb@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"9343434343\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": true,\n  \"City\": \"Salem\",\n  \"Enrolled_Date\": \"2025-06-23\"\n}"
+        },
+        "pairedItem": {
+          "item": 32
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1034\",\n  \"Name\": \"Mala S\",\n  \"Email\": \"malas@yahoo.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"8454545454\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Machine Learning\",\n  \"Fee_Paid\": false,\n  \"City\": \"Chennai\",\n  \"Enrolled_Date\": \"2025-03-21\"\n}"
+        },
+        "pairedItem": {
+          "item": 33
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1035\",\n  \"Name\": \"Karthi P\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"is_email_valid\": false,\n  \"Phone\": \"MISSING\",\n  \"is_phone_valid\": false,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": true,\n  \"City\": \"Coimbatore\",\n  \"Enrolled_Date\": \"2025-02-14\"\n}"
+        },
+        "pairedItem": {
+          "item": 34
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1036\",\n  \"Name\": \"Suganya T\",\n  \"Email\": \"suganyt@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"9676767676\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Data Science\",\n  \"Fee_Paid\": true,\n  \"City\": \"Madurai\",\n  \"Enrolled_Date\": \"2025-04-10\"\n}"
+        },
+        "pairedItem": {
+          "item": 35
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1037\",\n  \"Name\": \"Venkat R\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"Phone\": \"MISSING\",\n  \"Course\": \"Python\",\n  \"Fee_Paid\": false,\n  \"City\": \"Trichy\",\n  \"Enrolled_Date\": \"2025-02-12\",\n  \"is_email_valid\": false,\n  \"is_phone_valid\": false\n}"
+        },
+        "pairedItem": {
+          "item": 36
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1038\",\n  \"Name\": \"Indira K\",\n  \"Email\": \"indirak@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"MISSING\",\n  \"is_phone_valid\": false,\n  \"Course\": \"Machine Learning\",\n  \"Fee_Paid\": true,\n  \"City\": \"Chennai\",\n  \"Enrolled_Date\": \"2025-06-01\"\n}"
+        },
+        "pairedItem": {
+          "item": 37
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1039\",\n  \"Name\": \"Mohan J\",\n  \"Email\": \"mohanj@yahoo.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"9898989898\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": true,\n  \"City\": \"Salem\",\n  \"Enrolled_Date\": \"2025-01-23\"\n}"
+        },
+        "pairedItem": {
+          "item": 38
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1040\",\n  \"Name\": \"Dharani S\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"is_email_valid\": false,\n  \"Phone\": \"MISSING\",\n  \"is_phone_valid\": false,\n  \"Course\": \"Data Science\",\n  \"Fee_Paid\": false,\n  \"City\": \"UNKNOWN\",\n  \"Enrolled_Date\": \"2025-04-19\"\n}"
+        },
+        "pairedItem": {
+          "item": 39
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1041\",\n  \"Name\": \"Kishore M\",\n  \"Email\": \"kishorem@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"8010101010\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Machine Learning\",\n  \"Fee_Paid\": true,\n  \"City\": \"Chennai\",\n  \"Enrolled_Date\": \"2025-02-21\"\n}"
+        },
+        "pairedItem": {
+          "item": 40
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1042\",\n  \"Name\": \"Padma V\",\n  \"Email\": {\n    \"address\": \"INVALID_EMAIL\",\n    \"is_email_valid\": false\n  },\n  \"Phone\": {\n    \"number\": \"MISSING\",\n    \"is_phone_valid\": false\n  },\n  \"Course\": \"Python\",\n  \"Fee_Paid\": true,\n  \"City\": \"Coimbatore\",\n  \"Enrolled_Date\": \"2025-03-22\"\n}"
+        },
+        "pairedItem": {
+          "item": 41
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1043\",\n  \"Name\": \"Balaji T\",\n  \"Email\": \"balajit@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"7232323232\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Data Science\",\n  \"Fee_Paid\": false,\n  \"City\": \"Madurai\",\n  \"Enrolled_Date\": \"2025-03-17\"\n}"
+        },
+        "pairedItem": {
+          "item": 42
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1044\",\n  \"Name\": \"Rekha N\",\n  \"Email\": \"rekhan@yahoo.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"MISSING\",\n  \"Course\": \"Python\",\n  \"Fee_Paid\": true,\n  \"City\": \"Chennai\",\n  \"Enrolled_Date\": \"2025-02-05\"\n}"
+        },
+        "pairedItem": {
+          "item": 43
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1045\",\n  \"Name\": \"Selvam K\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"is_email_valid\": false,\n  \"Phone\": \"MISSING\",\n  \"is_phone_valid\": false,\n  \"Course\": \"Machine Learning\",\n  \"Fee_Paid\": true,\n  \"City\": \"Salem\",\n  \"Enrolled_Date\": \"2025-02-28\"\n}"
+        },
+        "pairedItem": {
+          "item": 44
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1046\",\n  \"Name\": \"Chitra R\",\n  \"Email\": \"chitrar@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"9454545454\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Machine Learning\",\n  \"Fee_Paid\": false,\n  \"City\": \"Trichy\",\n  \"Enrolled_Date\": \"2025-03-15\"\n}"
+        },
+        "pairedItem": {
+          "item": 45
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1047\",\n  \"Name\": \"Ganesh P\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"is_email_valid\": false,\n  \"Phone\": \"7565656565\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": true,\n  \"City\": \"Chennai\",\n  \"Enrolled_Date\": \"2025-06-27\"\n}"
+        },
+        "pairedItem": {
+          "item": 46
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1048\",\n  \"Name\": \"Latha S\",\n  \"Email\": \"lathas@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"8676767676\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Data Science\",\n  \"Fee_Paid\": true,\n  \"City\": \"Coimbatore\",\n  \"Enrolled_Date\": \"2025-04-04\"\n}"
+        },
+        "pairedItem": {
+          "item": 47
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1049\",\n  \"Name\": \"Suresh B\",\n  \"Email\": \"INVALID_EMAIL\",\n  \"is_email_valid\": false,\n  \"Phone\": \"MISSING\",\n  \"is_phone_valid\": false,\n  \"Course\": \"Python\",\n  \"Fee_Paid\": false,\n  \"City\": \"Madurai\",\n  \"Enrolled_Date\": \"2025-04-20\"\n}"
+        },
+        "pairedItem": {
+          "item": 48
+        }
+      },
+      {
+        "json": {
+          "text": "{\n  \"Student_ID\": \"STU1050\",\n  \"Name\": \"Ammu K\",\n  \"Email\": \"ammuk@gmail.com\",\n  \"is_email_valid\": true,\n  \"Phone\": \"9787878787\",\n  \"is_phone_valid\": true,\n  \"Course\": \"Machine Learning\",\n  \"Fee_Paid\": true,\n  \"City\": \"Chennai\",\n  \"Enrolled_Date\": \"2025-02-13\"\n}"
+        },
+        "pairedItem": {
+          "item": 49
+        }
+      }
+    ],
+    "Extract from File": [
+      {
+        "json": {
+          "Student_ID": "STU1001",
+          "Name": "manoj k",
+          "Email": "manojk@gmail",
+          "Phone": "9876543210",
+          "Course": "python",
+          "Fee_Paid": "yes",
+          "City": "Chennai",
+          "Enrolled_Date": "23-05-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1002",
+          "Name": "PRIYA S",
+          "Email": "priya.s@yahoo.com",
+          "Phone": "98765",
+          "Course": "Machine Learning",
+          "Fee_Paid": "No",
+          "City": "coimbatore",
+          "Enrolled_Date": "06-05-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1003",
+          "Name": "ravi kumar",
+          "Email": "ravikumar@",
+          "Phone": "9123456789",
+          "Course": "python",
+          "Fee_Paid": "YES",
+          "City": "MADURAI",
+          "Enrolled_Date": "19-02-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1004",
+          "Name": "Anitha R",
+          "Email": "anitha@gmail.com",
+          "Phone": "9000011111",
+          "Course": "ml",
+          "Fee_Paid": "no",
+          "City": "chennai",
+          "Enrolled_Date": "05-04-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1005",
+          "Name": "KARTHIK",
+          "Email": "karthik123",
+          "Course": "Python",
+          "Fee_Paid": "Yes",
+          "Enrolled_Date": "08-02-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1006",
+          "Name": "deepa m",
+          "Email": "deepam@gmail.com",
+          "Phone": "8123456789",
+          "Course": "DATA SCIENCE",
+          "Fee_Paid": "YES",
+          "City": "Salem",
+          "Enrolled_Date": "09-03-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1007",
+          "Name": "SURESH T",
+          "Email": "suresht@",
+          "Phone": "7654321098",
+          "Course": "Python",
+          "Fee_Paid": "no",
+          "City": "TRICHY",
+          "Enrolled_Date": "14-01-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1008",
+          "Name": "kavitha",
+          "Email": "kavitha99@gmail.com",
+          "Phone": "9988776655",
+          "Course": "machine learning",
+          "Fee_Paid": "Yes",
+          "City": "chennai",
+          "Enrolled_Date": "15-01-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1009",
+          "Name": "RAJESH KK",
+          "Email": "rajeshkk@gmail",
+          "Phone": "8877665544",
+          "Course": "PYTHON",
+          "Fee_Paid": "yes",
+          "City": "Coimbatore",
+          "Enrolled_Date": "15-05-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1010",
+          "Name": "nithya r",
+          "Email": "nithyar@yahoo.com",
+          "Phone": "9765432109",
+          "Course": "Data Science",
+          "Fee_Paid": "NO",
+          "City": "madurai",
+          "Enrolled_Date": "25-04-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1011",
+          "Name": "arun p",
+          "Email": "arunp@gmail.com",
+          "Phone": "7788990011",
+          "Course": "python",
+          "Fee_Paid": "Yes",
+          "City": "CHENNAI",
+          "Enrolled_Date": "17-06-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1012",
+          "Name": "MEENA D",
+          "Email": "meenad@",
+          "Course": "ML",
+          "Fee_Paid": "yes",
+          "City": "salem",
+          "Enrolled_Date": "21-02-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1013",
+          "Name": "santhosh v",
+          "Email": "santhoshv@gmail.com",
+          "Phone": "9900112233",
+          "Course": "Python",
+          "Fee_Paid": "NO",
+          "City": "Trichy",
+          "Enrolled_Date": "26-01-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1014",
+          "Name": "LAKSHMI",
+          "Email": "lakshmi@gmail",
+          "Phone": "8811223344",
+          "Course": "data science",
+          "Fee_Paid": "yes",
+          "City": "CHENNAI",
+          "Enrolled_Date": "07-03-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1015",
+          "Name": "vijay s",
+          "Email": "vijays@yahoo.com",
+          "Phone": "9922334455",
+          "Course": "machine learning",
+          "Fee_Paid": "Yes",
+          "City": "coimbatore",
+          "Enrolled_Date": "24-04-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1016",
+          "Name": "pooja n",
+          "Email": "poojan@gmail.com",
+          "Phone": "9090909090",
+          "Course": "PYTHON",
+          "Fee_Paid": "no",
+          "Enrolled_Date": "16-02-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1017",
+          "Name": "DINESH R",
+          "Email": "dinesh.r@",
+          "Phone": "8080808080",
+          "Course": "Data Science",
+          "Fee_Paid": "YES",
+          "City": "Madurai",
+          "Enrolled_Date": "23-02-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1018",
+          "Name": "saranya",
+          "Email": "saranya22@gmail.com",
+          "Course": "python",
+          "Fee_Paid": "yes",
+          "City": "chennai",
+          "Enrolled_Date": "11-02-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1019",
+          "Name": "BALA K",
+          "Email": "balak@gmail",
+          "Phone": "7070707070",
+          "Course": "Machine Learning",
+          "Fee_Paid": "No",
+          "City": "SALEM",
+          "Enrolled_Date": "12-06-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1020",
+          "Name": "revathi m",
+          "Email": "revathim@yahoo.com",
+          "Phone": "9191919191",
+          "Course": "ml",
+          "Fee_Paid": "yes",
+          "City": "Trichy",
+          "Enrolled_Date": "12-06-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1021",
+          "Name": "muthu s",
+          "Email": "muthus@gmail.com",
+          "Phone": "8282828282",
+          "Course": "Python",
+          "Fee_Paid": "YES",
+          "City": "Chennai",
+          "Enrolled_Date": "24-02-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1022",
+          "Name": "GEETHA",
+          "Email": "geetha@",
+          "Phone": "9393939393",
+          "Course": "DATA SCIENCE",
+          "Fee_Paid": "no",
+          "City": "COIMBATORE",
+          "Enrolled_Date": "08-05-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1023",
+          "Name": "prasanth j",
+          "Email": "prasanthj@gmail.com",
+          "Phone": "7474747474",
+          "Course": "python",
+          "Fee_Paid": "yes",
+          "City": "madurai",
+          "Enrolled_Date": "05-03-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1024",
+          "Name": "DIVYA P",
+          "Email": "divyap@yahoo.com",
+          "Phone": "8585858585",
+          "Course": "Machine Learning",
+          "Fee_Paid": "Yes",
+          "City": "Chennai",
+          "Enrolled_Date": "10-06-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1025",
+          "Name": "senthil k",
+          "Email": "senthilk@gmail",
+          "Course": "PYTHON",
+          "Fee_Paid": "NO",
+          "City": "TRICHY",
+          "Enrolled_Date": "15-05-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1026",
+          "Name": "janaki r",
+          "Email": "janakir@gmail.com",
+          "Phone": "9696969696",
+          "Course": "data science",
+          "Fee_Paid": "yes",
+          "City": "salem",
+          "Enrolled_Date": "02-05-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1027",
+          "Name": "RAMESH M",
+          "Email": "rameshm@",
+          "Phone": "7878787878",
+          "Course": "Python",
+          "Fee_Paid": "Yes",
+          "City": "Chennai",
+          "Enrolled_Date": "01-03-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1028",
+          "Name": "usha d",
+          "Email": "ushad@gmail.com",
+          "Phone": "8989898989",
+          "Course": "ML",
+          "Fee_Paid": "NO",
+          "City": "MADURAI",
+          "Enrolled_Date": "21-04-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1029",
+          "Name": "GOPAL V",
+          "Email": "gopalv@yahoo",
+          "Phone": "9010101010",
+          "Course": "python",
+          "Fee_Paid": "yes",
+          "City": "coimbatore",
+          "Enrolled_Date": "12-01-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1030",
+          "Name": "thenmozhi",
+          "Email": "thenmozhi@gmail.com",
+          "Phone": "8121212121",
+          "Course": "Machine Learning",
+          "Fee_Paid": "YES",
+          "Enrolled_Date": "13-04-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1031",
+          "Name": "arjun c",
+          "Email": "arjunc@gmail.com",
+          "Phone": "7232323232",
+          "Course": "PYTHON",
+          "Fee_Paid": "no",
+          "City": "Trichy",
+          "Enrolled_Date": "15-01-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1032",
+          "Name": "SWETHA L",
+          "Email": "swethal@",
+          "Course": "data science",
+          "Fee_Paid": "yes",
+          "City": "CHENNAI",
+          "Enrolled_Date": "26-05-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1033",
+          "Name": "naveen b",
+          "Email": "naveenb@gmail.com",
+          "Phone": "9343434343",
+          "Course": "Python",
+          "Fee_Paid": "Yes",
+          "City": "salem",
+          "Enrolled_Date": "23-06-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1034",
+          "Name": "MALA S",
+          "Email": "malas@yahoo.com",
+          "Phone": "8454545454",
+          "Course": "machine learning",
+          "Fee_Paid": "NO",
+          "City": "Chennai",
+          "Enrolled_Date": "21-03-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1035",
+          "Name": "karthi p",
+          "Email": "karthip@gmail",
+          "Phone": "7565656565",
+          "Course": "PYTHON",
+          "Fee_Paid": "yes",
+          "City": "COIMBATORE",
+          "Enrolled_Date": "14-02-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1036",
+          "Name": "suganya t",
+          "Email": "suganyt@gmail.com",
+          "Phone": "9676767676",
+          "Course": "Data Science",
+          "Fee_Paid": "YES",
+          "City": "madurai",
+          "Enrolled_Date": "10-04-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1037",
+          "Name": "VENKAT R",
+          "Email": "venkatr@",
+          "Phone": "8787878787",
+          "Course": "python",
+          "Fee_Paid": "no",
+          "City": "TRICHY",
+          "Enrolled_Date": "12-02-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1038",
+          "Name": "indira k",
+          "Email": "indirak@gmail.com",
+          "Course": "ML",
+          "Fee_Paid": "yes",
+          "City": "chennai",
+          "Enrolled_Date": "01-06-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1039",
+          "Name": "MOHAN J",
+          "Email": "mohanj@yahoo.com",
+          "Phone": "9898989898",
+          "Course": "Python",
+          "Fee_Paid": "Yes",
+          "City": "Salem",
+          "Enrolled_Date": "23-01-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1040",
+          "Name": "dharani s",
+          "Email": "dharanis@gmail",
+          "Phone": "7909090909",
+          "Course": "data science",
+          "Fee_Paid": "NO",
+          "Enrolled_Date": "19-04-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1041",
+          "Name": "kishore m",
+          "Email": "kishorem@gmail.com",
+          "Phone": "8010101010",
+          "Course": "machine learning",
+          "Fee_Paid": "yes",
+          "City": "CHENNAI",
+          "Enrolled_Date": "21-02-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1042",
+          "Name": "PADMA V",
+          "Email": "padmav@",
+          "Phone": "9121212121",
+          "Course": "PYTHON",
+          "Fee_Paid": "Yes",
+          "City": "coimbatore",
+          "Enrolled_Date": "22-03-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1043",
+          "Name": "balaji t",
+          "Email": "balajit@gmail.com",
+          "Phone": "7232323232",
+          "Course": "Data Science",
+          "Fee_Paid": "NO",
+          "City": "Madurai",
+          "Enrolled_Date": "17-03-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1044",
+          "Name": "REKHA N",
+          "Email": "rekhan@yahoo.com",
+          "Course": "python",
+          "Fee_Paid": "yes",
+          "City": "chennai",
+          "Enrolled_Date": "05-02-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1045",
+          "Name": "selvam k",
+          "Email": "selvamk@gmail",
+          "Phone": "8343434343",
+          "Course": "Machine Learning",
+          "Fee_Paid": "YES",
+          "City": "SALEM",
+          "Enrolled_Date": "28-02-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1046",
+          "Name": "chitra r",
+          "Email": "chitrar@gmail.com",
+          "Phone": "9454545454",
+          "Course": "ml",
+          "Fee_Paid": "no",
+          "City": "trichy",
+          "Enrolled_Date": "15-03-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1047",
+          "Name": "GANESH P",
+          "Email": "ganeshp@",
+          "Phone": "7565656565",
+          "Course": "Python",
+          "Fee_Paid": "yes",
+          "City": "Chennai",
+          "Enrolled_Date": "27-06-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1048",
+          "Name": "latha s",
+          "Email": "lathas@gmail.com",
+          "Phone": "8676767676",
+          "Course": "DATA SCIENCE",
+          "Fee_Paid": "Yes",
+          "City": "COIMBATORE",
+          "Enrolled_Date": "04-04-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1049",
+          "Name": "SURESH B",
+          "Email": "sureshb@yahoo",
+          "Course": "Python",
+          "Fee_Paid": "NO",
+          "City": "madurai",
+          "Enrolled_Date": "20-04-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1050",
+          "Name": "ammu k",
+          "Email": "ammuk@gmail.com",
+          "Phone": "9787878787",
+          "Course": "machine learning",
+          "Fee_Paid": "yes",
+          "City": "CHENNAI",
+          "Enrolled_Date": "13-02-2025"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ],
+    "Code in JavaScript": [
+      {
+        "json": {
+          "Student_ID": "STU1001",
+          "Name": "Manoj K",
+          "Email": "INVALID_EMAIL",
+          "is_email_valid": false,
+          "Phone": "MISSING",
+          "is_phone_valid": false,
+          "Course": "Python",
+          "Fee_Paid": true,
+          "City": "Chennai",
+          "Enrolled_Date": "2025-05-23"
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1002",
+          "Name": "Priya S",
+          "Email": "priya.s@yahoo.com",
+          "is_email_valid": true,
+          "Phone": "MISSING",
+          "is_phone_valid": false,
+          "Course": "Machine Learning",
+          "Fee_Paid": false,
+          "City": "Coimbatore",
+          "Enrolled_Date": "2025-05-06"
+        },
+        "pairedItem": {
+          "item": 1
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1003",
+          "Name": "Ravi Kumar",
+          "Email": "INVALID_EMAIL",
+          "is_email_valid": false,
+          "Phone": "9123456789",
+          "is_phone_valid": true,
+          "Course": "Python",
+          "Fee_Paid": true,
+          "City": "Madurai",
+          "Enrolled_Date": "2025-02-19"
+        },
+        "pairedItem": {
+          "item": 2
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1004",
+          "Name": "Anitha R",
+          "Email": "anitha@gmail.com",
+          "is_email_valid": true,
+          "Phone": "9000011111",
+          "is_phone_valid": true,
+          "Course": "Machine Learning",
+          "Fee_Paid": false,
+          "City": "Chennai",
+          "Enrolled_Date": "2025-04-05"
+        },
+        "pairedItem": {
+          "item": 3
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1005",
+          "Name": "Karthik",
+          "Email": "INVALID_EMAIL",
+          "is_email_valid": false,
+          "Phone": "MISSING",
+          "is_phone_valid": false,
+          "Course": "Python",
+          "Fee_Paid": true,
+          "City": "UNKNOWN",
+          "Enrolled_Date": "2025-02-08"
+        },
+        "pairedItem": {
+          "item": 4
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1006",
+          "Name": "Deepa M",
+          "Email": "deepam@gmail.com",
+          "is_email_valid": true,
+          "Phone": "8123456789",
+          "is_phone_valid": true,
+          "Course": "Data Science",
+          "Fee_Paid": true,
+          "City": "Salem",
+          "Enrolled_Date": "2025-03-09"
+        },
+        "pairedItem": {
+          "item": 5
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1007",
+          "Name": "Suresh T",
+          "Email": "INVALID_EMAIL",
+          "is_email_valid": false,
+          "Phone": "MISSING",
+          "is_phone_valid": false,
+          "Course": "Python",
+          "Fee_Paid": false,
+          "City": "Trichy",
+          "Enrolled_Date": "2025-01-14"
+        },
+        "pairedItem": {
+          "item": 6
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1008",
+          "Name": "Kavitha",
+          "Email": "kavitha99@gmail.com",
+          "is_email_valid": true,
+          "Phone": "9988776655",
+          "is_phone_valid": true,
+          "Course": "Machine Learning",
+          "Fee_Paid": true,
+          "City": "Chennai",
+          "Enrolled_Date": "2025-01-15"
+        },
+        "pairedItem": {
+          "item": 7
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1009",
+          "Name": "Rajesh Kk",
+          "Email": "INVALID_EMAIL",
+          "is_email_valid": false,
+          "Phone": "MISSING",
+          "is_phone_valid": false,
+          "Course": "Python",
+          "Fee_Paid": true,
+          "City": "Coimbatore",
+          "Enrolled_Date": "2025-05-15"
+        },
+        "pairedItem": {
+          "item": 8
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1010",
+          "Name": "Nithya R",
+          "Email": "nithyar@yahoo.com",
+          "is_email_valid": true,
+          "Phone": "9765432109",
+          "is_phone_valid": true,
+          "Course": "Data Science",
+          "Fee_Paid": false,
+          "City": "Madurai",
+          "Enrolled_Date": "2025-04-25"
+        },
+        "pairedItem": {
+          "item": 9
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1011",
+          "Name": "Arun P",
+          "Email": "arunp@gmail.com",
+          "is_email_valid": true,
+          "Phone": "7788990011",
+          "is_phone_valid": true,
+          "Course": "Python",
+          "Fee_Paid": true,
+          "City": "Chennai",
+          "Enrolled_Date": "2025-06-17"
+        },
+        "pairedItem": {
+          "item": 10
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1012",
+          "Name": "Meena D",
+          "Email": "INVALID_EMAIL",
+          "is_email_valid": false,
+          "Phone": "MISSING",
+          "is_phone_valid": false,
+          "Course": "Machine Learning",
+          "Fee_Paid": true,
+          "City": "Salem",
+          "Enrolled_Date": "2025-02-21"
+        },
+        "pairedItem": {
+          "item": 11
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1013",
+          "Name": "Santhosh V",
+          "Email": "santhoshv@gmail.com",
+          "is_email_valid": true,
+          "Phone": "9900112233",
+          "is_phone_valid": true,
+          "Course": "Python",
+          "Fee_Paid": false,
+          "City": "Trichy",
+          "Enrolled_Date": "2025-01-26"
+        },
+        "pairedItem": {
+          "item": 12
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1014",
+          "Name": "Lakshmi",
+          "Email": "INVALID_EMAIL",
+          "is_email_valid": false,
+          "Phone": "MISSING",
+          "is_phone_valid": false,
+          "Course": "Data Science",
+          "Fee_Paid": true,
+          "City": "Chennai",
+          "Enrolled_Date": "2025-03-07"
+        },
+        "pairedItem": {
+          "item": 13
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1015",
+          "Name": "Vijay S",
+          "Email": "vijays@yahoo.com",
+          "is_email_valid": true,
+          "Phone": "9922334455",
+          "is_phone_valid": true,
+          "Course": "Machine Learning",
+          "Fee_Paid": true,
+          "City": "Coimbatore",
+          "Enrolled_Date": "2025-04-24"
+        },
+        "pairedItem": {
+          "item": 14
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1016",
+          "Name": "Pooja N",
+          "Email": "poojan@gmail.com",
+          "is_email_valid": true,
+          "Phone": "9090909090",
+          "is_phone_valid": true,
+          "Course": "Python",
+          "Fee_Paid": false,
+          "City": "UNKNOWN",
+          "Enrolled_Date": "2025-02-16"
+        },
+        "pairedItem": {
+          "item": 15
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1017",
+          "Name": "Dinesh R",
+          "Email": "INVALID_EMAIL",
+          "is_email_valid": false,
+          "Phone": "MISSING",
+          "is_phone_valid": false,
+          "Course": "Data Science",
+          "Fee_Paid": true,
+          "City": "Madurai",
+          "Enrolled_Date": "2025-02-23"
+        },
+        "pairedItem": {
+          "item": 16
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1018",
+          "Name": "Saranya",
+          "Email": "saranya22@gmail.com",
+          "is_email_valid": false,
+          "Phone": "MISSING",
+          "Course": "Python",
+          "Fee_Paid": true,
+          "City": "Chennai",
+          "Enrolled_Date": "2025-02-11"
+        },
+        "pairedItem": {
+          "item": 17
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1019",
+          "Name": "Bala K",
+          "Email": "INVALID_EMAIL",
+          "Phone": "MISSING",
+          "Course": "Machine Learning",
+          "Fee_Paid": false,
+          "City": "Salem",
+          "Enrolled_Date": "2025-06-12",
+          "is_email_valid": false,
+          "is_phone_valid": false
+        },
+        "pairedItem": {
+          "item": 18
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1020",
+          "Name": "Revathi M",
+          "Email": "revathim@yahoo.com",
+          "is_email_valid": true,
+          "Phone": "9191919191",
+          "is_phone_valid": true,
+          "Course": "Machine Learning",
+          "Fee_Paid": true,
+          "City": "Trichy",
+          "Enrolled_Date": "2025-06-12"
+        },
+        "pairedItem": {
+          "item": 19
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1021",
+          "Name": "Muthu S",
+          "Email": "muthus@gmail.com",
+          "is_email_valid": true,
+          "Phone": "8282828282",
+          "is_phone_valid": true,
+          "Course": "Python",
+          "Fee_Paid": true,
+          "City": "Chennai",
+          "Enrolled_Date": "2025-02-24"
+        },
+        "pairedItem": {
+          "item": 20
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1022",
+          "Name": "Geetha",
+          "Email": "INVALID_EMAIL",
+          "Phone": "MISSING",
+          "Course": "Data Science",
+          "Fee_Paid": false,
+          "City": "Coimbatore",
+          "Enrolled_Date": "2025-05-08",
+          "is_email_valid": false,
+          "is_phone_valid": false
+        },
+        "pairedItem": {
+          "item": 21
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1023",
+          "Name": "Prasanth J",
+          "Email": "prasanthj@gmail.com",
+          "is_email_valid": true,
+          "Phone": "7474747474",
+          "is_phone_valid": true,
+          "Course": "Python",
+          "Fee_Paid": true,
+          "City": "Madurai",
+          "Enrolled_Date": "2025-03-05"
+        },
+        "pairedItem": {
+          "item": 22
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1024",
+          "Name": "Divya P",
+          "Email": "divyap@yahoo.com",
+          "is_email_valid": true,
+          "Phone": "8585858585",
+          "is_phone_valid": true,
+          "Course": "Machine Learning",
+          "Fee_Paid": true,
+          "City": "Chennai",
+          "Enrolled_Date": "2025-06-10"
+        },
+        "pairedItem": {
+          "item": 23
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1025",
+          "Name": "Senthil K",
+          "Email": "INVALID_EMAIL",
+          "is_email_valid": false,
+          "Phone": "MISSING",
+          "is_phone_valid": false,
+          "Course": "Python",
+          "Fee_Paid": false,
+          "City": "Trichy",
+          "Enrolled_Date": "2025-05-15"
+        },
+        "pairedItem": {
+          "item": 24
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1026",
+          "Name": "Janaki R",
+          "Email": "janakir@gmail.com",
+          "is_email_valid": true,
+          "Phone": "9696969696",
+          "is_phone_valid": true,
+          "Course": "Data Science",
+          "Fee_Paid": true,
+          "City": "Salem",
+          "Enrolled_Date": "2025-05-02"
+        },
+        "pairedItem": {
+          "item": 25
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1027",
+          "Name": "Ramesh M",
+          "Email": "INVALID_EMAIL",
+          "is_email_valid": false,
+          "Phone": "MISSING",
+          "is_phone_valid": false,
+          "Course": "Python",
+          "Fee_Paid": true,
+          "City": "Chennai",
+          "Enrolled_Date": "2025-03-01"
+        },
+        "pairedItem": {
+          "item": 26
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1028",
+          "Name": "Usha D",
+          "Email": "ushad@gmail.com",
+          "is_email_valid": true,
+          "Phone": "8989898989",
+          "is_phone_valid": true,
+          "Course": "Machine Learning",
+          "Fee_Paid": false,
+          "City": "Madurai",
+          "Enrolled_Date": "2025-04-21"
+        },
+        "pairedItem": {
+          "item": 27
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1029",
+          "Name": "Gopal V",
+          "Email": "INVALID_EMAIL",
+          "is_email_valid": false,
+          "Phone": "MISSING",
+          "is_phone_valid": false,
+          "Course": "Python",
+          "Fee_Paid": true,
+          "City": "Coimbatore",
+          "Enrolled_Date": "2025-01-12"
+        },
+        "pairedItem": {
+          "item": 28
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1030",
+          "Name": "Thenmozhi",
+          "Email": "thenmozhi@gmail.com",
+          "is_email_valid": true,
+          "Phone": "8121212121",
+          "is_phone_valid": true,
+          "Course": "Machine Learning",
+          "Fee_Paid": true,
+          "City": "UNKNOWN",
+          "Enrolled_Date": "2025-04-13"
+        },
+        "pairedItem": {
+          "item": 29
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1031",
+          "Name": "Arjun C",
+          "Email": "arjunc@gmail.com",
+          "is_email_valid": true,
+          "Phone": "7232323232",
+          "is_phone_valid": true,
+          "Course": "Python",
+          "Fee_Paid": false,
+          "City": "Trichy",
+          "Enrolled_Date": "2025-01-15"
+        },
+        "pairedItem": {
+          "item": 30
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1032",
+          "Name": "Swetha L",
+          "Email": "INVALID_EMAIL",
+          "is_email_valid": false,
+          "Phone": "MISSING",
+          "is_phone_valid": false,
+          "Course": "Data Science",
+          "Fee_Paid": true,
+          "City": "Chennai",
+          "Enrolled_Date": "2025-05-26"
+        },
+        "pairedItem": {
+          "item": 31
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1033",
+          "Name": "Naveen B",
+          "Email": "naveenb@gmail.com",
+          "is_email_valid": true,
+          "Phone": "9343434343",
+          "is_phone_valid": true,
+          "Course": "Python",
+          "Fee_Paid": true,
+          "City": "Salem",
+          "Enrolled_Date": "2025-06-23"
+        },
+        "pairedItem": {
+          "item": 32
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1034",
+          "Name": "Mala S",
+          "Email": "malas@yahoo.com",
+          "is_email_valid": true,
+          "Phone": "8454545454",
+          "is_phone_valid": true,
+          "Course": "Machine Learning",
+          "Fee_Paid": false,
+          "City": "Chennai",
+          "Enrolled_Date": "2025-03-21"
+        },
+        "pairedItem": {
+          "item": 33
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1035",
+          "Name": "Karthi P",
+          "Email": "INVALID_EMAIL",
+          "is_email_valid": false,
+          "Phone": "MISSING",
+          "is_phone_valid": false,
+          "Course": "Python",
+          "Fee_Paid": true,
+          "City": "Coimbatore",
+          "Enrolled_Date": "2025-02-14"
+        },
+        "pairedItem": {
+          "item": 34
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1036",
+          "Name": "Suganya T",
+          "Email": "suganyt@gmail.com",
+          "is_email_valid": true,
+          "Phone": "9676767676",
+          "is_phone_valid": true,
+          "Course": "Data Science",
+          "Fee_Paid": true,
+          "City": "Madurai",
+          "Enrolled_Date": "2025-04-10"
+        },
+        "pairedItem": {
+          "item": 35
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1037",
+          "Name": "Venkat R",
+          "Email": "INVALID_EMAIL",
+          "Phone": "MISSING",
+          "Course": "Python",
+          "Fee_Paid": false,
+          "City": "Trichy",
+          "Enrolled_Date": "2025-02-12",
+          "is_email_valid": false,
+          "is_phone_valid": false
+        },
+        "pairedItem": {
+          "item": 36
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1038",
+          "Name": "Indira K",
+          "Email": "indirak@gmail.com",
+          "is_email_valid": true,
+          "Phone": "MISSING",
+          "is_phone_valid": false,
+          "Course": "Machine Learning",
+          "Fee_Paid": true,
+          "City": "Chennai",
+          "Enrolled_Date": "2025-06-01"
+        },
+        "pairedItem": {
+          "item": 37
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1039",
+          "Name": "Mohan J",
+          "Email": "mohanj@yahoo.com",
+          "is_email_valid": true,
+          "Phone": "9898989898",
+          "is_phone_valid": true,
+          "Course": "Python",
+          "Fee_Paid": true,
+          "City": "Salem",
+          "Enrolled_Date": "2025-01-23"
+        },
+        "pairedItem": {
+          "item": 38
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1040",
+          "Name": "Dharani S",
+          "Email": "INVALID_EMAIL",
+          "is_email_valid": false,
+          "Phone": "MISSING",
+          "is_phone_valid": false,
+          "Course": "Data Science",
+          "Fee_Paid": false,
+          "City": "UNKNOWN",
+          "Enrolled_Date": "2025-04-19"
+        },
+        "pairedItem": {
+          "item": 39
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1041",
+          "Name": "Kishore M",
+          "Email": "kishorem@gmail.com",
+          "is_email_valid": true,
+          "Phone": "8010101010",
+          "is_phone_valid": true,
+          "Course": "Machine Learning",
+          "Fee_Paid": true,
+          "City": "Chennai",
+          "Enrolled_Date": "2025-02-21"
+        },
+        "pairedItem": {
+          "item": 40
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1042",
+          "Name": "Padma V",
+          "Email": {
+            "address": "INVALID_EMAIL",
+            "is_email_valid": false
+          },
+          "Phone": {
+            "number": "MISSING",
+            "is_phone_valid": false
+          },
+          "Course": "Python",
+          "Fee_Paid": true,
+          "City": "Coimbatore",
+          "Enrolled_Date": "2025-03-22"
+        },
+        "pairedItem": {
+          "item": 41
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1043",
+          "Name": "Balaji T",
+          "Email": "balajit@gmail.com",
+          "is_email_valid": true,
+          "Phone": "7232323232",
+          "is_phone_valid": true,
+          "Course": "Data Science",
+          "Fee_Paid": false,
+          "City": "Madurai",
+          "Enrolled_Date": "2025-03-17"
+        },
+        "pairedItem": {
+          "item": 42
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1044",
+          "Name": "Rekha N",
+          "Email": "rekhan@yahoo.com",
+          "is_email_valid": true,
+          "Phone": "MISSING",
+          "Course": "Python",
+          "Fee_Paid": true,
+          "City": "Chennai",
+          "Enrolled_Date": "2025-02-05"
+        },
+        "pairedItem": {
+          "item": 43
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1045",
+          "Name": "Selvam K",
+          "Email": "INVALID_EMAIL",
+          "is_email_valid": false,
+          "Phone": "MISSING",
+          "is_phone_valid": false,
+          "Course": "Machine Learning",
+          "Fee_Paid": true,
+          "City": "Salem",
+          "Enrolled_Date": "2025-02-28"
+        },
+        "pairedItem": {
+          "item": 44
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1046",
+          "Name": "Chitra R",
+          "Email": "chitrar@gmail.com",
+          "is_email_valid": true,
+          "Phone": "9454545454",
+          "is_phone_valid": true,
+          "Course": "Machine Learning",
+          "Fee_Paid": false,
+          "City": "Trichy",
+          "Enrolled_Date": "2025-03-15"
+        },
+        "pairedItem": {
+          "item": 45
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1047",
+          "Name": "Ganesh P",
+          "Email": "INVALID_EMAIL",
+          "is_email_valid": false,
+          "Phone": "7565656565",
+          "is_phone_valid": true,
+          "Course": "Python",
+          "Fee_Paid": true,
+          "City": "Chennai",
+          "Enrolled_Date": "2025-06-27"
+        },
+        "pairedItem": {
+          "item": 46
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1048",
+          "Name": "Latha S",
+          "Email": "lathas@gmail.com",
+          "is_email_valid": true,
+          "Phone": "8676767676",
+          "is_phone_valid": true,
+          "Course": "Data Science",
+          "Fee_Paid": true,
+          "City": "Coimbatore",
+          "Enrolled_Date": "2025-04-04"
+        },
+        "pairedItem": {
+          "item": 47
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1049",
+          "Name": "Suresh B",
+          "Email": "INVALID_EMAIL",
+          "is_email_valid": false,
+          "Phone": "MISSING",
+          "is_phone_valid": false,
+          "Course": "Python",
+          "Fee_Paid": false,
+          "City": "Madurai",
+          "Enrolled_Date": "2025-04-20"
+        },
+        "pairedItem": {
+          "item": 48
+        }
+      },
+      {
+        "json": {
+          "Student_ID": "STU1050",
+          "Name": "Ammu K",
+          "Email": "ammuk@gmail.com",
+          "is_email_valid": true,
+          "Phone": "9787878787",
+          "is_phone_valid": true,
+          "Course": "Machine Learning",
+          "Fee_Paid": true,
+          "City": "Chennai",
+          "Enrolled_Date": "2025-02-13"
+        },
+        "pairedItem": {
+          "item": 49
+        }
+      }
+    ]
+  },
+  "connections": {
+    "CSV_upload": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "If1",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "other district",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If1": {
+      "main": [
+        [
+          {
+            "node": "chennai_valid_mails",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "chennai_invalid_mail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "f24a9c49-5bd1-439c-8b82-2c9a3e35e791",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "f6d852c3216d9a63b28e4fb9587d6292aba69d44bd67c023e7a22f18e8822fda"
+  },
+  "nodeGroups": [],
+  "id": "7RYVY1wnjJKHKNjz",
+  "tags": []
+}
